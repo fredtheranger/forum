@@ -4,7 +4,7 @@ http://lucumr.pocoo.org/2007/5/21/getting-started-with-wsgi/
 '''
 import re
 from cgi import escape
-from forum.models.post import Post
+from forum.models.post import get_posts_as_html
 
 def _header(title = ''):
     html = '''
@@ -27,17 +27,7 @@ def _footer():
 
 def index(environ, start_response):
     start_response('200 OK', [('Content-Type', 'text/html')])
-    html = ''
-    for key, p in Post.get().iteritems():
-        post_html = '<h2><a href="/view/%s">%s</a></h2><h5>posted by %s on %s</h5><p>%s</p><br />' % ( key, p.title, p.posted_by, p.post_date, p.body )
-        html += str(post_html)
-    return [_header(), html, _footer()]
-
-def view(environ, start_response):
-    start_response('200 OK', [('Content-Type', 'text/html')])
-    args = environ['myapp.url_args']
-    post_id = escape(args[0])
-    return [_header(), post_id, _footer()]
+    return [_header(), get_posts_as_html(), _footer()]
 
 def add(environ, start_response):
     # get the name from the url if it was specified there.
@@ -64,8 +54,7 @@ def not_found(environ, start_response):
 # map urls to functions
 urls = [
     (r'^$', index),
-    (r'^view/(.+)$', view),
-    (r'add/?$', add),
+    (r'new/?$', add),
     (r'edit/(.+)$', edit)
 ]
 

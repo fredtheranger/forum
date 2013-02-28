@@ -13,13 +13,11 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS posts
                ''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS users
-                (username text, password text, 
-                realname text, role text)
+                (username text, password text, role text, 
+                unique(username) on conflict replace )
                 ''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS files
                 (filename text, uploaded_by text, 
-                file_type text)
+                file_type text, unique(filename) )
                 ''')
-
-cursor.execute('INSERT INTO users VALUES("admin", ')

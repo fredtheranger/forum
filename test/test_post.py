@@ -1,7 +1,6 @@
 import unittest
-from datetime import datetime
 
-from forum.models.post import Post
+from forum.models.post import save_post, get_post, get_posts_as_html
 from forum.dao.sqlite3dao import DAO
 
 class TestPost(unittest.TestCase):
@@ -17,17 +16,16 @@ class TestPost(unittest.TestCase):
         self.dao.execute('DROP TABLE posts')
     
     def test_save_get(self):
-        p = Post()
-        p.title = 'Test Post'
-        p.post_date = datetime.isoformat(datetime.now())
-        p.posted_by = 'Mike'
-        p.body = 'This is a test post'
-                
-        p.save()
-        #print p.rowid
+        rowid = save_post('Test Post', 'mikec', 'This is a test post')
+        post = get_post(rowid)
+        self.assertEqual(post['title'], u'Test Post')
         
-        post = Post.get(1)
-        self.assertEqual(post.title, p.title)
+    def test_get_posts_as_html(self):
+        save_post('Test Post', 'mikec', 'This is a test post')
+        html = get_posts_as_html()
+        regex = r'.*<h2>Test Post</h2>.*'
+        self.assertRegexpMatches(html, regex)
+        
         
 if __name__ == '__main__':
     unittest.main()

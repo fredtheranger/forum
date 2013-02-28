@@ -16,6 +16,7 @@ class DAO(Singleton):
 
     def _connect(self):
         self.c = sqlite3.connect(self._db)
+        self.c.row_factory = sqlite3.Row
     
     def _get_cursor(self):
         try:
@@ -29,18 +30,22 @@ class DAO(Singleton):
 
     def get(self, query, params = None):
         cur = self._get_cursor()
-        if params:
-            cur.execute(query, params)
-        else:
-            cur.execute(query)
-        rows = cur.fetchall()
-        cur.close()
-        return rows
+        try:
+            if params:
+                cur.execute(query, params)
+            else:
+                cur.execute(query) 
+            rows = cur.fetchall()
+            return rows
+        except Exception as e:
+            print 'DB Error: %s' % e
+            return False
+        finally:    
+            cur.close()
 
     def execute(self, query, params = None):
         cur = self._get_cursor()
         if params:
-            print params
             cur.execute(query, params)
         else:
             cur.execute(query)
