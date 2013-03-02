@@ -1,4 +1,5 @@
 import sqlite3
+from forum.config.config import Config
 
 class Singleton(object):
     _instance = None
@@ -10,7 +11,9 @@ class Singleton(object):
 
 class DAO(Singleton):
 
-    def __init__(self, db = 'forum.db'):
+    def __init__(self, db = None):
+        if db == None:
+            db = Config().get('db.path')
         self._db = db
         self._connect()
 
@@ -35,8 +38,7 @@ class DAO(Singleton):
                 cur.execute(query, params)
             else:
                 cur.execute(query) 
-            rows = cur.fetchall()
-            return rows
+            return cur.fetchall()
         except Exception as e:
             print 'DB Error: %s' % e
             return False

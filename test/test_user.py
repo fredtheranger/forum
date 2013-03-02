@@ -6,13 +6,13 @@ from forum.dao.sqlite3dao import DAO
 class TestUser(unittest.TestCase):
     
     def setUp(self):
-        DAO('forum.db').execute('''CREATE TABLE users
+        DAO().execute('''CREATE TABLE users
                                 (username text, password text, role text)
                                 ''')
         save_user('mikec', 'secret')
         
     def tearDown(self):
-        DAO('forum.db').execute('DROP TABLE users')
+        DAO().execute('DROP TABLE users')
         
     def test_get_user_by_id(self):     
         user = get_user_by_id(1)

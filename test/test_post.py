@@ -1,32 +1,28 @@
 import unittest
 
-from forum.models.post import save_post, get_post, get_posts_as_html
-from forum.dao.sqlite3dao import DAO
+from forum.models.post import save_post, get_posts, get_posts_as_html
+from setup_create_db import create_posts_table, drop_table
 
 class TestPost(unittest.TestCase):
     
     def setUp(self):
-        self.dao = DAO('forum.db')
-        self.dao.execute('''CREATE TABLE posts
-                      (title text, post_date text, 
-                       posted_by text, body text) 
-                       ''')
+        create_posts_table()
     
     def tearDown(self):
-        self.dao.execute('DROP TABLE posts')
+        drop_table('posts')
     
     def test_save_get(self):
-        rowid = save_post('Test Post', 'mikec', 'This is a test post')
-        post = get_post(rowid)
+        save_post(1, 'Test Post', 'mikec', 'This is a test post')
+        posts = get_posts(1)
+        post = posts.pop()
         self.assertEqual(post['title'], u'Test Post')
-        
+       
     def test_get_posts_as_html(self):
-        save_post('Test Post', 'mikec', 'This is a test post')
-        html = get_posts_as_html()
+        save_post(1, 'Test Post', 'mikec', 'This is a test post')
+        html = get_posts_as_html(1)
         regex = r'.*<h2>Test Post</h2>.*'
         self.assertRegexpMatches(html, regex)
-        
-        
+    
 if __name__ == '__main__':
     unittest.main()
         

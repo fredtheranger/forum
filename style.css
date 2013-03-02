@@ -1,0 +1,8 @@
+body { color: #536482; background-color: #ACA8A1;  }
+h1 a { color: #536482; text-decoration: none; }
+#header { border-bottom: 1px solid #536482; margin-bottom: 10px; }
+#main { margin: 0 50px 0 50px; padding:10px; background-color: #ffffff;}
+#threads th, #threads td { border: 1px solid #536482; padding: 5px; }
+#footer { text-align:center; margin-top: 50px; border-top: 1px solid #536482; }
+#footer p { font-size: 80% }
+.form {  width: 500px; margin-left: auto; margin-right: auto; }

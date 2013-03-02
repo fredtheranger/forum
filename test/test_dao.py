@@ -4,7 +4,7 @@ from forum.dao.sqlite3dao import DAO
 class TestDao(unittest.TestCase):
     
     def setUp(self):
-        self.dao = DAO('forum.db')
+        self.dao = DAO()
         self.dao.execute('''CREATE TABLE posts
                             (title text, body text)
                             ''')

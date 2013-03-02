@@ -4,47 +4,103 @@ http://lucumr.pocoo.org/2007/5/21/getting-started-with-wsgi/
 '''
 import re
 from cgi import escape
-from forum.models.post import get_posts_as_html
+import cgi
+import urllib
+from forum.models.post import get_posts_as_html, get_post_form, save_post
+from forum.models.thread import get_threads_as_html, get_thread_form, save_thread
 
-def _header(title = ''):
+def _header(title = 'Home'):
+    css = urllib.quote(open("style.css", "rb").read().encode("base64"))
+    
     html = '''
     <html>
     <head>
     <title>Forum :: %s</title>
-    <link rel=stylesheet href="style.css" type="text/css" media=screen>
+    <link rel=stylesheet href="data:text/css;base64,%s" type="text/css" media=screen>
     </head>
     <body>
-    <h1>Forum</h1>
+    <div id="main">
+    <div id="header">
+    <h1><a href="/">A Simple Secure Forum</a></h1>
+    </div>
     '''
     
-    return html % title
+    return html % ( title, css )
 
 def _footer():
     return '''
-    <p>Footer</p>
+    <div id="footer">
+    <p>All posts reflect the opinion of the poster and not the forum owner.</p>
+    </div>
+    </div>
     </body>
     </html>'''
 
 def index(environ, start_response):
-    start_response('200 OK', [('Content-Type', 'text/html')])
-    return [_header(), get_posts_as_html(), _footer()]
+    
+    html = "%s\n%s\n%s" % ( _header(), get_threads_as_html(), _footer() )
+        
+    start_response('200 OK', [
+        ('Content-Type', 'text/html; charset=utf-8'),
+        ('Content-Length', str(len(html)))
+    ])
+    
+    return [ html.encode('UTF-8') ]
 
-def add(environ, start_response):
-    # get the name from the url if it was specified there.
-    args = environ['myapp.url_args']
-    if args:
-        subject = escape(args[0])
+def add_thread(environ, start_response):
+    if environ['REQUEST_METHOD'] == 'POST':
+        form = cgi.FieldStorage(fp=environ['wsgi.input'], environ=environ)
+        title = form.getvalue("title")
+        rowid = save_thread(title)
+        html = '<div><p>Thread saved. <a href="/thread/%s">Go to thread</a>.</p></div>' % rowid
     else:
-        subject = 'World'
+        html = get_thread_form()
+        
+    html = "%s\n%s\n%s" % ( _header(), html, _footer() )
+        
+    start_response('200 OK', [
+        ('Content-Type', 'text/html; charset=utf-8'),
+        ('Content-Length', str(len(html)))
+    ])
     
-    start_response('200 OK', [('Content-Type', 'text/html')])
-    return ['''Hello %(subject)s
-            Hello %(subject)s!
+    return [ html.encode('UTF-8') ]
 
-''' % {'subject': subject}]
+def view_thread(environ, start_response):
     
-def edit(environ, start_response):
-    return [ 'edit post' ]
+    args = environ['myapp.url_args']
+    threadid = escape(args[0]) if args else None
+    
+    html = "%s\n%s\n%s" % ( _header(), get_posts_as_html(threadid), _footer() )
+        
+    start_response('200 OK', [
+        ('Content-Type', 'text/html; charset=utf-8'),
+        ('Content-Length', str(len(html)))
+    ])
+    
+    return [ html.encode('UTF-8') ]
+
+def add_post(environ, start_response):
+    
+    args = environ['myapp.url_args']
+    threadid = escape(args[0]) if args else None
+   
+    if environ['REQUEST_METHOD'] == 'POST':
+        form = cgi.FieldStorage(fp=environ['wsgi.input'], environ=environ)
+        title = form.getvalue("title")
+        body = form.getvalue("body")
+        save_post(threadid, title, None, body)
+        html = '<div><p>Post saved. <a href="/thread/%s">Go to thread</a>.</p></div>' % threadid
+    else:
+        html = get_post_form()
+        
+    html = "%s\n%s\n%s" % ( _header(), html, _footer() )
+        
+    start_response('200 OK', [
+        ('Content-Type', 'text/html; charset=utf-8'),
+        ('Content-Length', str(len(html)))
+    ])
+    
+    return [ html.encode('UTF-8') ]
 
 def not_found(environ, start_response):
     """Called if no URL matches."""
@@ -54,8 +110,9 @@ def not_found(environ, start_response):
 # map urls to functions
 urls = [
     (r'^$', index),
-    (r'new/?$', add),
-    (r'edit/(.+)$', edit)
+    (r'^thread/([0-9]+)/?$', view_thread),
+    (r'^thread/([0-9]+)/post/?$', add_post),
+    (r'^thread/add/?$', add_thread)
 ]
 
 def application(environ, start_response):
