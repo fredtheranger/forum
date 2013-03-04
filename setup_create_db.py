@@ -23,8 +23,7 @@ def create_users_table():
 
 def create_files_table():
     DAO().execute('''CREATE TABLE IF NOT EXISTS files
-                (filename text, uploaded_by text, 
-                file_type text, unique(filename) )
+                (postid text, filename text, filetype text )
                 ''')
     
 def drop_table(table):

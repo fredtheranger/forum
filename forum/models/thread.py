@@ -17,9 +17,10 @@ def get_thread(rowid):
 def get_threads(rowid = None):
     params = None
     
-    
-    # TODO: Add post count and last post
-    sql = 'SELECT rowid, title, create_date, 0 as posts, "never" as last_post FROM threads'
+    sql = '''SELECT threads.rowid, threads.title, 
+                (SELECT COUNT(posts.rowid) FROM posts WHERE threadid = threads.rowid)  AS posts, 
+                (SELECT MAX(posts.post_date) FROM posts WHERE threadid = threads.rowid) AS last_post 
+            FROM threads;'''
     
     if rowid:
         sql += ' WHERE rowid = ?'
@@ -61,6 +62,7 @@ def get_thread_form():
             <label>Thread Topic: </label>
             <input type="text" name="title" id="title" />
             <input type="submit" name="submit" value="Create"/>
+            <input type="button" name="cancel" value="Cancel" onclick="history.go(-1); return false"/> 
         </form>
     </div>
     '''

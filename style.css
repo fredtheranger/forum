@@ -6,3 +6,5 @@ h1 a { color: #536482; text-decoration: none; }
 #footer { text-align:center; margin-top: 50px; border-top: 1px solid #536482; }
 #footer p { font-size: 80% }
 .form {  width: 500px; margin-left: auto; margin-right: auto; }
+.post { border-top: 1px solid #536482; }
+.dateline { font-size:small; margin-top: -20px; }
