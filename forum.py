@@ -10,16 +10,26 @@
         http://docs.python.org/2/library/cgi.html
         http://lucumr.pocoo.org/2007/5/21/getting-started-with-wsgi/
         http://www.python.org/dev/peps/pep-0333/#optional-platform-specific-file-handling
+        http://www.jayconrod.com/posts/17/how-to-use-http-cookies-in-python
+        http://stackoverflow.com/questions/11554833/redirection-using-wsgiref
+        http://stackoverflow.com/questions/14107260/set-a-cookie-and-retrieve-it-with-python-and-wsgi
+
 '''
 import re
 from cgi import escape
 import cgi
 import urllib
 import os.path
+import Cookie
+import datetime
+import random 
+from urlparse import parse_qs
 from forum.models.post import get_posts_as_html, get_post_form, save_post
 from forum.models.thread import get_threads_as_html, get_thread_form, save_thread
 from forum.models.file import save_file, get_file, get_allowed_filetypes
 from forum.config.config import Config
+from forum.models.user import authenticate, get_login_form
+from forum.models.session import save_session, get_session
 
 def _header(title = 'Home'):
     css = urllib.quote(open("style.css", "rb").read().encode("base64"))
@@ -47,7 +57,20 @@ def _footer():
     </div>
     </body>
     </html>'''
-
+    
+def _is_logged_in(environ):
+    #expiration = datetime.datetime.now() + datetime.timedelta(minutes=30)
+    #print environ
+    try:
+        cookie = Cookie.SimpleCookie(environ["HTTP_COOKIE"])
+        print environ.get("HTTP_COOKIE","")
+        print cookie
+        return True
+    except (Cookie.CookieError, KeyError):
+        print "session cookie not set!"
+        
+    return False
+    
 def index(environ, start_response):
     
     html = "%s\n%s\n%s" % ( _header(), get_threads_as_html(), _footer() )
@@ -60,6 +83,13 @@ def index(environ, start_response):
     return [ html.encode('UTF-8') ]
 
 def add_thread(environ, start_response):
+    if not _is_logged_in(environ):
+        path = environ.get('PATH_INFO', '').lstrip('/')
+        start_response('302 Found', [ 
+                            ('Content-Type', 'text/plain'),
+                            ('Location', '/login?ref=/%s' % path) 
+        ])
+        return [ '' ] 
     
     if environ['REQUEST_METHOD'] == 'POST':
         form = cgi.FieldStorage(fp=environ['wsgi.input'], environ=environ)
@@ -97,6 +127,13 @@ def view_thread(environ, start_response):
     return [ html.encode('UTF-8') ]
 
 def add_post(environ, start_response):
+    if not _is_logged_in(environ):
+        path = environ.get('PATH_INFO', '').lstrip('/')
+        start_response('302 Found', [ 
+                            ('Content-Type', 'text/plain'),
+                            ('Location', '/login?ref=/%s' % path) 
+        ])
+        return [ '' ] 
     
     args = environ['myapp.url_args']
     threadid = escape(args[0]) if args else None
@@ -161,6 +198,68 @@ def deliver_file(environ, start_response):
     start_response('404 NOT FOUND', [('Content-Type', 'text/plain')])
     return ['Page Not Found']
 
+def login(environ, start_response):
+    
+    if environ['REQUEST_METHOD'] == 'POST':
+        form = cgi.FieldStorage(fp=environ['wsgi.input'], environ=environ)
+        username = form.getvalue("username")
+        password = form.getvalue("password")
+        user = authenticate(username, password)
+        
+        if user:
+            expiration = datetime.datetime.now() + datetime.timedelta(minutes=30)
+            #cookie = Cookie.SimpleCookie()
+            #cookie["session"] = random.randint(10000,1000000000)
+            #cookie["session"]["expires"] = expiration.strftime("%a, %d-%b-%Y %H:%M:%S UTC")
+            #cookie["session"]["path"] = "/"
+            #cookie["session"]["domain"] = ".forum.local"
+              
+            #print cookie.output()
+            
+            qs = parse_qs(environ['QUERY_STRING'])
+            
+            # never trust those dirty users!
+            ref = qs.get('ref')[0]
+            #ref = escape(ref)
+            
+            
+            sessionid = random.randint(10000,1000000000)
+            save_session(sessionid, user['rowid'], expiration)
+            
+            #start_response('302 Found', [ 
+            #                ('Content-Type', 'text/plain') ])
+                            #('Location', '%s' % ref) ])
+            #return [ cookie.output() ]
+            
+            #headers = [ ('Location', ref ) ]
+            #headers.extend(("Set-Cookie", cookie)
+
+            #start_response("302 Found", headers)  
+            
+            #start_response('200 OK', [ ('Set-Cookie', cookie["session"].OutputString()) ] )
+            start_response('302 Found', [ 
+                                 ('Set-Cookie', 'session=%s' % sessionid),
+                                 ('Location', ref)
+            ])
+            return []
+
+        else:
+            html = "%s\n%s\n%s" % ( _header(), 'Sorry, login invalid. \
+                <a href="javascript:" onclick="history.go(-1); return false">go back</a>.</p>', _footer() )    
+
+    else:
+        html = "%s\n%s\n%s" % ( _header(), get_login_form(), _footer() )
+            
+    start_response('200 OK', [
+        ('Content-Type', 'text/html; charset=utf-8'),
+        ('Content-Length', str(len(html)))
+    ])
+    
+    return [ html.encode('UTF-8') ]
+
+def logout(environ, start_response):
+    pass
+
 def not_found(environ, start_response):
     """Called if no URL matches."""
     start_response('404 NOT FOUND', [('Content-Type', 'text/plain')])
@@ -172,7 +271,9 @@ urls = [
     (r'^thread/([0-9]+)/?$', view_thread),
     (r'^thread/([0-9]+)/post/?$', add_post),
     (r'^thread/add/?$', add_thread),
-    (r'^files/(.+)$', deliver_file)
+    (r'^files/(.+)$', deliver_file),
+    (r'^login/?$', login),
+    (r'^logout/?$', logout)
 ]
 
 def application(environ, start_response):

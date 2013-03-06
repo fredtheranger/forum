@@ -40,7 +40,6 @@ def get_threads_as_html():
         html += '<table width="100%">\n'
         html += '<tr><th>Topic</th><th>Posts</th><th>Last post</th></tr>\n'
         for thread in threads:
-            print thread
             html += '<tr>\n'
             html += '<td><a href="/thread/%s">%s</a></td><td align="center">%s</td><td align="center">%s</td>\n' % (
                     thread['rowid'], thread['title'], thread['posts'], thread['last_post'])

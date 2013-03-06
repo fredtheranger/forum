@@ -3,3 +3,4 @@
 *.pyo
 test/forum.db
 forum.db
+test/test.db

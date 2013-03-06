@@ -30,7 +30,7 @@ def get_user_by_username(username):
              FROM users
              WHERE username = ?'''
     rs = DAO().get(sql, [ username ])
-    return list.pop(rs) if len(rs) == 1 else False
+    return list.pop(rs) if rs else False
 
 def get_user_by_id(rowid):
     return get_users(rowid)
@@ -53,6 +53,22 @@ def save_user(username, password, role='user'):
     rowid = DAO().execute(sql, params)
     return rowid
 
-        
+def get_login_form():
+    html = '''
+    <h2>Please login</h2>
+    <div class="form">
+    <form method="post">
+    <label>Username:</label>
+    <input type="text" name="username">
+    <br />
+    <label>Password:&nbsp;</lable>
+    <input type="password" name="password">
+    <br />
+    <input type="submit" name="submit" value="Login">
+    <input type="button" name="cancel" value="Cancel">
+    </form>
+    </div>
+    '''
+    return html    
         
         
