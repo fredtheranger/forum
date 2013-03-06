@@ -13,6 +13,7 @@
         http://www.jayconrod.com/posts/17/how-to-use-http-cookies-in-python
         http://stackoverflow.com/questions/11554833/redirection-using-wsgiref
         http://stackoverflow.com/questions/14107260/set-a-cookie-and-retrieve-it-with-python-and-wsgi
+        http://eli.thegreenplace.net/2011/06/24/django-sessions-part-i-cookies/
 
 '''
 import re
@@ -21,7 +22,7 @@ import cgi
 import urllib
 import os.path
 import Cookie
-import datetime
+from datetime import datetime, timedelta
 import random 
 from urlparse import parse_qs
 from forum.models.post import get_posts_as_html, get_post_form, save_post
@@ -59,17 +60,20 @@ def _footer():
     </html>'''
     
 def _is_logged_in(environ):
-    #expiration = datetime.datetime.now() + datetime.timedelta(minutes=30)
-    #print environ
     try:
         cookie = Cookie.SimpleCookie(environ["HTTP_COOKIE"])
-        print environ.get("HTTP_COOKIE","")
-        print cookie
-        return True
+        sessionid = cookie["session"].value
+        session = get_session(sessionid)
+        if session:
+            expiration = session["expiration"]
+            userid = session["userid"]
+            token = session["token"]
+            if datetime.now().isoformat() < expiration:
+                return userid, token
     except (Cookie.CookieError, KeyError):
-        print "session cookie not set!"
+        print "User not logged in!"
         
-    return False
+    return False, False
     
 def index(environ, start_response):
     
@@ -83,7 +87,8 @@ def index(environ, start_response):
     return [ html.encode('UTF-8') ]
 
 def add_thread(environ, start_response):
-    if not _is_logged_in(environ):
+    userid, token = _is_logged_in(environ)
+    if not userid:
         path = environ.get('PATH_INFO', '').lstrip('/')
         start_response('302 Found', [ 
                             ('Content-Type', 'text/plain'),
@@ -101,7 +106,7 @@ def add_thread(environ, start_response):
             html = '''<p>Thread topic must not be blank, 
                 <a href="javascript:" onclick="history.go(-1); return false">go back</a>.</p>'''
     else:
-        html = get_thread_form()
+        html = get_thread_form(token)
         
     html = "%s\n%s\n%s" % ( _header(), html, _footer() )
         
@@ -127,7 +132,8 @@ def view_thread(environ, start_response):
     return [ html.encode('UTF-8') ]
 
 def add_post(environ, start_response):
-    if not _is_logged_in(environ):
+    userid, token = _is_logged_in(environ)
+    if not userid:
         path = environ.get('PATH_INFO', '').lstrip('/')
         start_response('302 Found', [ 
                             ('Content-Type', 'text/plain'),
@@ -142,32 +148,36 @@ def add_post(environ, start_response):
         form = cgi.FieldStorage(fp=environ['wsgi.input'], environ=environ)
         title = form.getvalue("title")
         body = form.getvalue("body")
+        form_token = form.getvalue("token")
         
         if title and body:
             
-            postid = save_post(threadid, escape(title), None, escape(body))
-            
-            # handle the file if needed
-            fileitem = form['file']
-            if fileitem.filename:
-                fn = os.path.basename(fileitem.filename)
-                ext = os.path.splitext(fn)[1][1:].lower()
-                if any(ext in s for s in get_allowed_filetypes()):
-                    save_path = os.path.join(Config().get('upload.dir'), fn)
-                    open(save_path, 'wb').write(fileitem.file.read())
-                    save_file(postid, fn, ext)
-                    html = '<div><p>Post and upload saved. <a href="/thread/%s">Go to thread</a>.</p></div>' % threadid
-                else:
-                    html = '''<p>Filetype of [ %s ] is not allowed,
-                            <a href="javascript:" onclick="history.go(-1); return false">go back</a>.</p>''' % ext
-            else:
-                html = '<div><p>Post saved. <a href="/thread/%s">Go to thread</a>.</p></div>' % threadid
+            if form_token == token:
                 
+                postid = save_post(threadid, escape(title), userid, escape(body))
+                
+                # handle the file if needed
+                fileitem = form['file']
+                if fileitem.filename:
+                    fn = os.path.basename(fileitem.filename)
+                    ext = os.path.splitext(fn)[1][1:].lower()
+                    if any(ext in s for s in get_allowed_filetypes()):
+                        save_path = os.path.join(Config().get('upload.dir'), fn)
+                        open(save_path, 'wb').write(fileitem.file.read())
+                        save_file(postid, fn, ext)
+                        html = '<div><p>Post and upload saved. <a href="/thread/%s">Go to thread</a>.</p></div>' % threadid
+                    else:
+                        html = '''<p>Filetype of [ %s ] is not allowed,
+                                <a href="javascript:" onclick="history.go(-1); return false">go back</a>.</p>''' % ext
+                else:
+                    html = '<div><p>Post saved. <a href="/thread/%s">Go to thread</a>.</p></div>' % threadid
+            else:
+                html = '<p>Sorry, no CSRF allowed!</p>'    
         else:
             html = '''Post title and body must not be blank, 
                 <a href="javascript:" onclick="history.go(-1); return false">go back</a>.</p>'''
     else:
-        html = get_post_form()
+        html = get_post_form(token)
         
     html = "%s\n%s\n%s" % ( _header(), html, _footer() )
         
@@ -185,15 +195,16 @@ def deliver_file(environ, start_response):
     
     if fileid:
         f = get_file(fileid)
-        filepath = os.path.join(Config().get('upload.dir'), f['filename'])
-        if os.path.exists(filepath):
-            fn = open(filepath, "rb")
-            content_type = 'application/download'
-            start_response( "200 OK", [
-                            ('Content-Type', content_type),
-                            ('Content-disposition', 'attachment; filename=%s' % str(os.path.basename(filepath)))
-            ])
-            return fn.read()
+        if f: 
+            filepath = os.path.join(Config().get('upload.dir'), f['filename'])
+            if os.path.exists(filepath):
+                fn = open(filepath, "rb")
+                content_type = 'application/download'
+                start_response( "200 OK", [
+                                ('Content-Type', content_type),
+                                ('Content-disposition', 'attachment; filename=%s' % str(os.path.basename(filepath)))
+                ])
+                return fn.read()
     
     start_response('404 NOT FOUND', [('Content-Type', 'text/plain')])
     return ['Page Not Found']
@@ -207,36 +218,16 @@ def login(environ, start_response):
         user = authenticate(username, password)
         
         if user:
-            expiration = datetime.datetime.now() + datetime.timedelta(minutes=30)
-            #cookie = Cookie.SimpleCookie()
-            #cookie["session"] = random.randint(10000,1000000000)
-            #cookie["session"]["expires"] = expiration.strftime("%a, %d-%b-%Y %H:%M:%S UTC")
-            #cookie["session"]["path"] = "/"
-            #cookie["session"]["domain"] = ".forum.local"
-              
-            #print cookie.output()
-            
+            expiration = datetime.now() + timedelta(minutes=30)
             qs = parse_qs(environ['QUERY_STRING'])
             
             # never trust those dirty users!
             ref = qs.get('ref')[0]
-            #ref = escape(ref)
-            
+            ref = escape(ref)
             
             sessionid = random.randint(10000,1000000000)
-            save_session(sessionid, user['rowid'], expiration)
+            save_session(sessionid, user['rowid'], expiration.isoformat())
             
-            #start_response('302 Found', [ 
-            #                ('Content-Type', 'text/plain') ])
-                            #('Location', '%s' % ref) ])
-            #return [ cookie.output() ]
-            
-            #headers = [ ('Location', ref ) ]
-            #headers.extend(("Set-Cookie", cookie)
-
-            #start_response("302 Found", headers)  
-            
-            #start_response('200 OK', [ ('Set-Cookie', cookie["session"].OutputString()) ] )
             start_response('302 Found', [ 
                                  ('Set-Cookie', 'session=%s' % sessionid),
                                  ('Location', ref)

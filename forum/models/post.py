@@ -12,8 +12,10 @@ def save_post(threadid, title, posted_by, body):
 
 def get_posts(threadid):
     sql = '''SELECT p.rowid AS rowid, p.title AS title, 
-                post_date, posted_by, body, t.title AS topic
-            FROM posts p INNER JOIN threads t ON p.threadid = t.rowid
+                post_date, u.username as username, body, t.title AS topic
+            FROM posts p 
+                INNER JOIN threads t ON p.threadid = t.rowid
+                LEFT JOIN users u ON p.posted_by = u.rowid
             WHERE p.threadid = ?'''
     params = [ threadid ]
     
@@ -32,7 +34,7 @@ def get_posts_as_html(threadid):
         for post in posts:
             html += '<div class="post">\n'
             html += '<h3>%s</h3>\n' % post['title']
-            html += '<p class="dateline">Posted by %s on %s</p>\n' % ( post['posted_by'], post['post_date'] )
+            html += '<p class="dateline">Posted by %s on %s</p>\n' % ( post['username'], post['post_date'] )
             html += '<p>%s</p>\n' % post['body']
                 
             # Check for downloads
@@ -50,12 +52,14 @@ def get_posts_as_html(threadid):
     
     return html
 
-def get_post_form():
+def get_post_form(token):
     icon_question_mark = urllib.quote(open("images/icon_question_mark.gif", "rb").read().encode("base64"))
     
     html = """
     <div id="add-post" class="form">
         <form id="form" name="form" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="token" value="%s" />
+        
         <h2>New post</h2>
         <p>Add your $0.02 to the forum. Please don't try any funny business!</p>
         
@@ -74,6 +78,6 @@ def get_post_form():
         <input type="button" name="cancel" value="Cancel" onclick="history.go(-1); return false"/> 
         </form>
     </div>
-    """ % ( ', '.join(get_allowed_filetypes()), icon_question_mark )
+    """ % (token,  ', '.join(get_allowed_filetypes()), icon_question_mark )
     
     return html

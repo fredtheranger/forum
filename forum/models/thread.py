@@ -17,7 +17,7 @@ def get_thread(rowid):
 def get_threads(rowid = None):
     params = None
     
-    sql = '''SELECT threads.rowid, threads.title, 
+    sql = '''SELECT threads.rowid as rowid, threads.title as title, 
                 (SELECT COUNT(posts.rowid) FROM posts WHERE threadid = threads.rowid)  AS posts, 
                 (SELECT MAX(posts.post_date) FROM posts WHERE threadid = threads.rowid) AS last_post 
             FROM threads;'''
@@ -52,11 +52,12 @@ def get_threads_as_html():
     
     return html
 
-def get_thread_form():
+def get_thread_form(token):
     html = '''
     <h2>New thread</h2>
     <div id="add-thread" class="form">
         <form id="form" name="form" method="post">
+            <input type="hidden" name="token" value="%s" />
             <p>Add a new thread and start a discussion!</p>
             <label>Thread Topic: </label>
             <input type="text" name="title" id="title" />
@@ -64,7 +65,7 @@ def get_thread_form():
             <input type="button" name="cancel" value="Cancel" onclick="history.go(-1); return false"/> 
         </form>
     </div>
-    '''
+    ''' % token
     return html
 
 
